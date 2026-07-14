@@ -71,7 +71,7 @@ export const ROLE_PERMISSIONS: Record<string, { resource: string; action: string
     { resource: 'leads', action: 'create' }, { resource: 'leads', action: 'read' }, { resource: 'leads', action: 'update' },
     { resource: 'proposals', action: 'create' }, { resource: 'proposals', action: 'read' }, { resource: 'proposals', action: 'update' },
     { resource: 'contracts', action: 'read' },
-    { resource: 'invoices', action: 'read' },
+    { resource: 'invoices', action: 'create' }, { resource: 'invoices', action: 'read' }, { resource: 'invoices', action: 'update' },
     { resource: 'reports', action: 'read' },
     { resource: 'announcements', action: 'read' },
     { resource: 'knowledge_base', action: 'create' }, { resource: 'knowledge_base', action: 'read' }, { resource: 'knowledge_base', action: 'update' },

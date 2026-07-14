@@ -8,7 +8,10 @@ export const invoicesController = {
   },
 
   async getById(req: Request, res: Response) {
-    const invoice = await invoicesService.getById(String(req.params.id), req.user!.companyId)
+    const isClient = Boolean(req.user!.companyId)
+    const invoice = isClient
+      ? await invoicesService.getById(String(req.params.id), req.user!.companyId)
+      : await invoicesService.getByIdForStaff(String(req.params.id), null)
     res.json({ status: 'success', data: invoice })
   },
 
@@ -22,8 +25,27 @@ export const invoicesController = {
     res.json({ status: 'success', data: invoice })
   },
 
+  /**
+   * Send invoice to client.
+   * - { markOnly: true } → status SENT only (no email)
+   * - otherwise emails PDF (pdfBase64 optional) to company contacts / client users
+   */
   async send(req: Request, res: Response) {
-    const invoice = await invoicesService.markSent(String(req.params.id), req.user!.companyId)
-    res.json({ status: 'success', data: invoice })
+    if (req.body?.markOnly === true) {
+      const invoice = await invoicesService.markSent(String(req.params.id), req.user!.companyId)
+      res.json({ status: 'success', data: invoice })
+      return
+    }
+
+    const result = await invoicesService.sendEmail(String(req.params.id), req.user!.companyId, {
+      email: req.body?.email,
+      message: req.body?.message,
+      pdfBase64: req.body?.pdfBase64,
+    })
+    res.json({
+      status: 'success',
+      data: result.invoice,
+      email: result.email,
+    })
   },
 }
