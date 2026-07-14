@@ -1,0 +1,844 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../src/generated/prisma"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ─── ENUMS ───
+
+enum UserRole {
+  SUPER_ADMIN
+  LANTERN_STAFF
+  PROJECT_MANAGER
+  SUPPORT_AGENT
+  FINANCE_MANAGER
+  CLIENT_ADMIN
+  CLIENT_USER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_ON_CLIENT
+  ESCALATED
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL_SENT
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+// ─── COMPANY (TENANT) ───
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  domain    String?
+  logo      String?
+  industry  String?
+  address   String?
+  phone     String?
+  website   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  reps          CompanyRep[]
+  contacts      CompanyContact[]
+  subscriptions CompanySubscription[]
+  projects      Project[]
+  tickets       Ticket[]
+  invoices      Invoice[]
+  contracts     Contract[]
+  leads         Lead[]
+  proposals     Proposal[]
+  files         FileAsset[]
+  announcements Announcement[]
+  knowledgeBases KnowledgeBase[]
+  goals         Goal[]
+}
+
+model CompanyRep {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String
+  role      String   @default("account_manager")
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([companyId, userId])
+}
+
+model CompanyContact {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  email     String
+  phone     String?
+  role      String?
+  isPrimary Boolean  @default(false)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model CompanySubscription {
+  id          String   @id @default(cuid())
+  companyId   String
+  category    String   // "software" | "cybersecurity" | "engineering"
+  name        String   // e.g. "Kronyx", "Red Team Operations", "Web Design & Development"
+  isCustom    Boolean  @default(false)
+  status      String   @default("active") // active, inactive, pending, trial
+  startDate   DateTime?
+  endDate     DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, category, name])
+}
+
+// ─── USER & AUTH ───
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  avatar       String?
+  phone        String?
+  role         UserRole
+  companyId    String?
+  isActive     Boolean   @default(true)
+  mfaEnabled   Boolean   @default(false)
+  mfaSecret    String?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // HR / Employee fields
+  employeeId       String?   @unique
+  departmentId     String?
+  employmentType   String?   // "full_time", "part_time", "contractor", "intern"
+  jobTitle         String?
+  dateOfBirth      DateTime?
+  nationality      String?
+  address          String?
+  city             String?
+  country          String?
+  postalCode       String?
+  personalEmail    String?
+  personalPhone    String?
+  startDate        DateTime?
+  endDate          DateTime?
+  idCardBarcode    String?
+  bio              String?
+
+  // Next of kin
+  nextOfKinName    String?
+  nextOfKinRelation String?
+  nextOfKinPhone   String?
+  nextOfKinEmail   String?
+
+  company         Company?         @relation(fields: [companyId], references: [id])
+  department      Department?      @relation(fields: [departmentId], references: [id])
+  permissions     UserPermission[]
+  sessions        Session[]
+  assignedTasks   Task[]           @relation("TaskAssignee")
+  createdTasks    Task[]           @relation("TaskCreator")
+  comments        Comment[]
+  timeEntries     TimeEntry[]
+  createdTickets  Ticket[]         @relation("TicketCreator")
+  assignedTickets Ticket[]         @relation("TicketAssignee")
+  messages        Message[]
+  auditLogs       AuditLog[]
+  notifications   Notification[]
+  companyReps     CompanyRep[]
+  invitesSent     Invite[]
+  employeeContracts EmployeeContract[]
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  headId      String?
+  color       String   @default("#ffd900")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     User[]
+}
+
+model EmployeeContract {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  type        String   // "employment", "nda", "contractor_agreement", "amendment"
+  content     String?
+  status      String   @default("draft") // "draft", "active", "expired", "terminated"
+  startDate   DateTime?
+  endDate     DateTime?
+  fileKey     String?
+  signedByEmployee Boolean @default(false)
+  signedByLantern  Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Invite {
+  id        String       @id @default(cuid())
+  email     String
+  role      UserRole
+  companyId String?
+  status    InviteStatus @default(PENDING)
+  token     String       @unique
+  expiresAt DateTime
+  invitedBy String
+  createdAt DateTime     @default(now())
+
+  inviter User @relation(fields: [invitedBy], references: [id])
+}
+
+// ─── RBAC ───
+
+model Permission {
+  id          String @id @default(cuid())
+  resource    String
+  action      String
+  description String?
+
+  userPermissions UserPermission[]
+  roleDefaults    RoleDefaultPermission[]
+
+  @@unique([resource, action])
+}
+
+model UserPermission {
+  id           String  @id @default(cuid())
+  userId       String
+  permissionId String
+  granted      Boolean @default(true)
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([userId, permissionId])
+}
+
+model RoleDefaultPermission {
+  id           String   @id @default(cuid())
+  role         UserRole
+  permissionId String
+
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([role, permissionId])
+}
+
+// ─── PROJECT MANAGEMENT ───
+
+model Project {
+  id          String        @id @default(cuid())
+  companyId   String?
+  name        String
+  description String?
+  status      ProjectStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Decimal?      @db.Decimal(12, 2)
+  currency    String        @default("USD")
+  serviceCategory String?   // "software" | "cybersecurity" | "engineering" | "custom"
+  serviceName     String?   // predefined or custom service name
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  company     Company?    @relation(fields: [companyId], references: [id])
+  milestones  Milestone[]
+  tasks       Task[]
+  comments    Comment[]
+  files       FileAsset[]
+  timeEntries TimeEntry[]
+  invoices    Invoice[]
+  expenses    Expense[]
+  channels    Channel[]
+}
+
+model Milestone {
+  id          String    @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  dueDate     DateTime?
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+}
+
+model Task {
+  id             String       @id @default(cuid())
+  projectId      String
+  milestoneId    String?
+  parentTaskId   String?
+  title          String
+  description    String?
+  status         TaskStatus   @default(TODO)
+  priority       TaskPriority @default(MEDIUM)
+  assigneeId     String?
+  createdById    String
+  dueDate        DateTime?
+  estimatedHours Float?
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone    Milestone?       @relation(fields: [milestoneId], references: [id])
+  parentTask   Task?            @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
+  subtasks     Task[]           @relation("TaskSubtasks")
+  assignee     User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdBy    User             @relation("TaskCreator", fields: [createdById], references: [id])
+  comments     Comment[]
+  timeEntries  TimeEntry[]
+  dependencies TaskDependency[] @relation("DependentTask")
+  dependents   TaskDependency[] @relation("DependencyTask")
+}
+
+model TaskDependency {
+  id              String @id @default(cuid())
+  dependentTaskId String
+  dependencyId    String
+
+  dependentTask Task @relation("DependentTask", fields: [dependentTaskId], references: [id], onDelete: Cascade)
+  dependency    Task @relation("DependencyTask", fields: [dependencyId], references: [id], onDelete: Cascade)
+
+  @@unique([dependentTaskId, dependencyId])
+}
+
+// ─── SUPPORT & TICKETING ───
+
+model Ticket {
+  id           String         @id @default(cuid())
+  companyId    String
+  subject      String
+  description  String
+  status       TicketStatus   @default(OPEN)
+  priority     TicketPriority @default(MEDIUM)
+  category     String?
+  createdById  String
+  assigneeId   String?
+  slaDeadline  DateTime?
+  resolvedAt   DateTime?
+  closedAt     DateTime?
+  satisfaction Int?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id])
+  createdBy User     @relation("TicketCreator", fields: [createdById], references: [id])
+  assignee  User?    @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  comments  Comment[]
+  files     FileAsset[]
+}
+
+// ─── CRM ───
+
+model Lead {
+  id             String     @id @default(cuid())
+  companyId      String?
+  contactName    String
+  contactEmail   String
+  contactPhone   String?
+  contactRole    String?
+  companyName    String?
+  organizationType String?
+  source         String?    // "website_form", "referral", "event", "cold_outreach", "partner", "manual"
+  sourcePage     String?    // which page the form was on: "killchain", "cybersecurity-operations", etc.
+  serviceInterest String?   // which service they're interested in
+  temperature    String     @default("warm") // "hot", "warm", "cold"
+  status         LeadStatus @default(NEW)
+  value          Decimal?   @db.Decimal(12, 2)
+  currency       String     @default("USD")
+  notes          String?
+  requirements   String?    // from form textarea
+  assignedToId   String?
+  lastContactedAt DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  company    Company?       @relation(fields: [companyId], references: [id])
+  proposals  Proposal[]
+  activities LeadActivity[]
+}
+
+model LeadActivity {
+  id        String   @id @default(cuid())
+  leadId    String
+  type      String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model Proposal {
+  id                 String    @id @default(cuid())
+  companyId          String
+  leadId             String?
+  title              String
+  content            Json
+  totalValue         Decimal   @db.Decimal(12, 2)
+  currency           String    @default("USD")
+  status             String    @default("draft")
+  sentAt             DateTime?
+  acceptedAt         DateTime?
+  expiresAt          DateTime?
+  signatureUrl       String?
+  convertedProjectId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  lead    Lead?   @relation(fields: [leadId], references: [id])
+}
+
+model Contract {
+  id              String    @id @default(cuid())
+  companyId       String
+  title           String
+  type            String
+  content         String?
+  status          String    @default("draft")
+  version         Int       @default(1)
+  startDate       DateTime?
+  endDate         DateTime?
+  renewalDate     DateTime?
+  autoRenew       Boolean   @default(false)
+  signedByClient  Boolean   @default(false)
+  signedByLantern Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  company Company     @relation(fields: [companyId], references: [id])
+  files   FileAsset[]
+}
+
+// ─── FINANCIAL ───
+
+model Invoice {
+  id                String        @id @default(cuid())
+  companyId         String
+  projectId         String?
+  invoiceNumber     String        @unique
+  status            InvoiceStatus @default(DRAFT)
+  issueDate         DateTime      @default(now())
+  dueDate           DateTime
+  subtotal          Decimal       @db.Decimal(12, 2)
+  tax               Decimal       @default(0) @db.Decimal(12, 2)
+  total             Decimal       @db.Decimal(12, 2)
+  currency          String        @default("USD")
+  notes             String?
+  isRecurring       Boolean       @default(false)
+  recurringInterval String?
+  paidAt            DateTime?
+  stripePaymentId   String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  company   Company           @relation(fields: [companyId], references: [id])
+  project   Project?          @relation(fields: [projectId], references: [id])
+  lineItems InvoiceLineItem[]
+  payments  Payment[]
+}
+
+model InvoiceLineItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Decimal @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(12, 2)
+  total       Decimal @db.Decimal(12, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id         String    @id @default(cuid())
+  invoiceId  String
+  amount     Decimal   @db.Decimal(12, 2)
+  currency   String    @default("USD")
+  method     String
+  externalId String?
+  status     String    @default("pending")
+  paidAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  name          String
+  bankName      String
+  accountNumber String?
+  bsb           String?
+  swift         String?
+  currency      String   @default("USD")
+  accountType   String   @default("business") // "business", "savings", "operating", "tax"
+  balance       Decimal  @default(0) @db.Decimal(14, 2)
+  isActive      Boolean  @default(true)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  expenses      Expense[]
+  transactions  Transaction[]
+}
+
+model Expense {
+  id            String   @id @default(cuid())
+  bankAccountId String?
+  projectId     String?
+  category      String
+  subcategory   String?
+  vendor        String?
+  description   String
+  amount        Decimal  @db.Decimal(12, 2)
+  currency      String   @default("USD")
+  date          DateTime
+  receiptKey    String?
+  receiptName   String?
+  status        String   @default("pending") // "pending", "approved", "rejected", "reimbursed"
+  isTaxDeductible Boolean @default(true)
+  taxCategory   String?  // "operating", "travel", "equipment", "software", "professional_services", "marketing", "office", "utilities", "insurance", "other"
+  submittedById String?
+  approvedById  String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  project       Project?     @relation(fields: [projectId], references: [id])
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  bankAccountId String
+  type          String   // "credit" (money in) | "debit" (money out)
+  amount        Decimal  @db.Decimal(14, 2)
+  currency      String   @default("USD")
+  description   String
+  reference     String?
+  invoiceId     String?
+  expenseId     String?
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id])
+}
+
+// ─── TIME TRACKING ───
+
+model TimeEntry {
+  id          String    @id @default(cuid())
+  userId      String
+  projectId   String
+  taskId      String?
+  description String?
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int?
+  billable    Boolean   @default(true)
+  hourlyRate  Decimal?  @db.Decimal(8, 2)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id])
+  project Project  @relation(fields: [projectId], references: [id])
+  task    Task?    @relation(fields: [taskId], references: [id])
+}
+
+// ─── COMMUNICATION ───
+
+model Channel {
+  id        String   @id @default(cuid())
+  name      String
+  type      String
+  projectId String?
+  createdAt DateTime @default(now())
+
+  project  Project?        @relation(fields: [projectId], references: [id])
+  messages Message[]
+  members  ChannelMember[]
+}
+
+model ChannelMember {
+  id        String   @id @default(cuid())
+  channelId String
+  userId    String
+  joinedAt  DateTime @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+}
+
+model Message {
+  id         String    @id @default(cuid())
+  channelId  String
+  senderId   String
+  content    String
+  isInternal Boolean   @default(false)
+  editedAt   DateTime?
+  createdAt  DateTime  @default(now())
+
+  channel Channel     @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  sender  User        @relation(fields: [senderId], references: [id])
+  files   FileAsset[]
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  userId     String
+  content    String
+  projectId  String?
+  taskId     String?
+  ticketId   String?
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+  task    Task?    @relation(fields: [taskId], references: [id])
+  ticket  Ticket?  @relation(fields: [ticketId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String?
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── CONTENT ───
+
+model KnowledgeBase {
+  id          String    @id @default(cuid())
+  companyId   String?
+  title       String
+  slug        String
+  content     String
+  category    String?
+  isPublic    Boolean   @default(false)
+  isInternal  Boolean   @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, slug])
+}
+
+model Announcement {
+  id          String    @id @default(cuid())
+  companyId   String?
+  title       String
+  content     String
+  type        String
+  isPublished Boolean   @default(false)
+  audience    String    @default("all")
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id])
+}
+
+model FileAsset {
+  id           String   @id @default(cuid())
+  companyId    String?
+  name         String
+  originalName String
+  mimeType     String
+  size         Int
+  storageKey   String
+  version      Int      @default(1)
+  uploadedById String
+  projectId    String?
+  ticketId     String?
+  contractId   String?
+  messageId    String?
+  createdAt    DateTime @default(now())
+
+  company  Company?  @relation(fields: [companyId], references: [id])
+  project  Project?  @relation(fields: [projectId], references: [id])
+  ticket   Ticket?   @relation(fields: [ticketId], references: [id])
+  contract Contract? @relation(fields: [contractId], references: [id])
+  message  Message?  @relation(fields: [messageId], references: [id])
+}
+
+// ─── CALENDAR ───
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  allDay      Boolean  @default(false)
+  type        String
+  location    String?
+  createdById String
+  projectId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attendees CalendarAttendee[]
+}
+
+model CalendarAttendee {
+  id      String @id @default(cuid())
+  eventId String
+  userId  String
+  status  String @default("pending")
+
+  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+// ─── GOALS ───
+
+model Goal {
+  id           String   @id @default(cuid())
+  companyId    String?
+  title        String
+  description  String?
+  type         String
+  targetValue  Decimal  @db.Decimal(12, 2)
+  currentValue Decimal  @default(0) @db.Decimal(12, 2)
+  unit         String   @default("USD")
+  startDate    DateTime
+  endDate      DateTime
+  status       String   @default("active")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id])
+}
+
+// ─── AUDIT LOG ───
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  companyId  String?
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([resource, resourceId])
+}
