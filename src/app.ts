@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 import { config } from './config/index.js'
 import { errorHandler } from './middleware/errorHandler.js'
+import { ensureBootstrapped } from './bootstrap.js'
 
 import { authRoutes } from './modules/auth/auth.routes.js'
 import { userRoutes } from './modules/users/users.routes.js'
@@ -55,8 +56,19 @@ app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser())
 
+// Health stays free of DB bootstrap so deploys can be probed even if DB is warming
 app.get('/api/v1/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// Connect DB (and light seeds) before authenticated / data routes
+app.use(async (_req, _res, next) => {
+  try {
+    await ensureBootstrapped()
+    next()
+  } catch (err) {
+    next(err)
+  }
 })
 
 // Public lead submission (no auth)

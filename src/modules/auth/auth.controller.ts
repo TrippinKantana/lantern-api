@@ -8,10 +8,11 @@ export class AuthController {
       ipAddress: req.ip,
     })
 
+    // sameSite lax works with same-site reverse proxy (www → /api) and is safer than strict for login redirects
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production' || process.env.VERCEL === '1',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/v1/auth',
     })
@@ -36,8 +37,8 @@ export class AuthController {
 
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production' || process.env.VERCEL === '1',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/v1/auth',
     })
