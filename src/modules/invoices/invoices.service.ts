@@ -234,6 +234,45 @@ export const invoicesService = {
     return invoice
   },
 
+  /** Records a payment against an invoice and marks it PAID only once fully covered. */
+  async recordPayment(
+    id: string,
+    userCompanyId: string | null,
+    data: { amount: number; method: string; externalId?: string; paidAt?: string },
+  ) {
+    const invoice = await this.getByIdForStaff(id, userCompanyId)
+    const amount = Number(data.amount)
+    if (!amount || amount <= 0) throw new ValidationError('Payment amount must be greater than zero')
+    if (!data.method?.trim()) throw new ValidationError('Payment method is required')
+
+    const paidAt = data.paidAt ? new Date(data.paidAt) : new Date()
+
+    await prisma.payment.create({
+      data: {
+        invoiceId: id,
+        amount,
+        currency: invoice.currency,
+        method: data.method,
+        externalId: data.externalId || undefined,
+        status: 'completed',
+        paidAt,
+      },
+    })
+
+    const totalPaid = await prisma.payment.aggregate({
+      where: { invoiceId: id, status: 'completed' },
+      _sum: { amount: true },
+    })
+    const paidSoFar = Number(totalPaid._sum.amount || 0)
+    const isFullyPaid = paidSoFar >= Number(invoice.total)
+
+    return prisma.invoice.update({
+      where: { id },
+      data: isFullyPaid ? { status: 'PAID', paidAt } : {},
+      include: invoiceInclude,
+    })
+  },
+
   async markSent(id: string, userCompanyId: string | null) {
     const invoice = await this.getByIdForStaff(id, userCompanyId)
     return prisma.invoice.update({

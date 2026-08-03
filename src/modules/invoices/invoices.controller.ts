@@ -30,6 +30,11 @@ export const invoicesController = {
     res.json({ status: 'success', data: null })
   },
 
+  async recordPayment(req: Request, res: Response) {
+    const invoice = await invoicesService.recordPayment(String(req.params.id), req.user!.companyId, req.body)
+    res.status(201).json({ status: 'success', data: invoice })
+  },
+
   /**
    * Send invoice to client.
    * - { markOnly: true } → status SENT only (no email)
