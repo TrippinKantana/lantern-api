@@ -212,6 +212,15 @@ export const invoicesService = {
     })
   },
 
+  /** Permanently deletes an invoice regardless of status (draft, sent, paid, etc). */
+  async delete(id: string, userCompanyId: string | null) {
+    await this.getByIdForStaff(id, userCompanyId)
+    await prisma.$transaction([
+      prisma.payment.deleteMany({ where: { invoiceId: id } }),
+      prisma.invoice.delete({ where: { id } }),
+    ])
+  },
+
   /** Staff/admin can view drafts; clients cannot. */
   async getByIdForStaff(id: string, userCompanyId: string | null) {
     const where: any = { id }
@@ -267,7 +276,7 @@ export const invoicesService = {
     const text = [
       `Hello,`,
       ``,
-      `Please find invoice ${updated.invoiceNumber} from Lantern Systems.`,
+      `Please find invoice ${updated.invoiceNumber} from Lantern Inc.`,
       ``,
       `Amount due: ${updated.currency} ${Number(updated.total).toFixed(2)}`,
       `Due date: ${new Date(updated.dueDate).toLocaleDateString()}`,
@@ -277,7 +286,7 @@ export const invoicesService = {
       portalNote,
       ``,
       `Regards,`,
-      `Lantern Systems`,
+      `Lantern Inc.`,
       `info@lanternsystems.com`,
     ]
       .filter((line) => line !== null)
@@ -296,7 +305,7 @@ export const invoicesService = {
 
     const mailResult = await sendMail({
       to: recipients,
-      subject: `Invoice ${updated.invoiceNumber} from Lantern Systems`,
+      subject: `Invoice ${updated.invoiceNumber} from Lantern Inc.`,
       text,
       attachments,
     })

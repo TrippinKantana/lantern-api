@@ -12,6 +12,7 @@ router.get('/', rbac('invoices', 'read'), (req, res, next) => { invoicesControll
 router.post('/', rbac('invoices', 'create'), (req, res, next) => { invoicesController.create(req, res).catch(next) })
 router.get('/:id', rbac('invoices', 'read'), (req, res, next) => { invoicesController.getById(req, res).catch(next) })
 router.patch('/:id', rbac('invoices', 'update'), (req, res, next) => { invoicesController.update(req, res).catch(next) })
+router.delete('/:id', rbac('invoices', 'delete'), (req, res, next) => { invoicesController.delete(req, res).catch(next) })
 router.post('/:id/send', rbac('invoices', 'update'), (req, res, next) => { invoicesController.send(req, res).catch(next) })
 
 export { router as invoiceRoutes }

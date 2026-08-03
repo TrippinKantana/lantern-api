@@ -1,15 +1,7 @@
 import { prisma } from '../../config/database.js'
 import type { TaskStatus, TaskPriority } from '../../generated/prisma/client.js'
-import { NotFoundError, AppError } from '../../shared/utils/errors.js'
+import { NotFoundError } from '../../shared/utils/errors.js'
 import { parsePagination, paginatedResponse } from '../../shared/utils/pagination.js'
-
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  TODO: ['IN_PROGRESS', 'BLOCKED'],
-  IN_PROGRESS: ['IN_REVIEW', 'BLOCKED', 'TODO'],
-  IN_REVIEW: ['DONE', 'IN_PROGRESS'],
-  BLOCKED: ['TODO', 'IN_PROGRESS'],
-  DONE: ['IN_PROGRESS'],
-}
 
 export const tasksService = {
   async list(filters: any, userCompanyId: string | null) {
@@ -100,14 +92,7 @@ export const tasksService = {
   },
 
   async update(id: string, data: any) {
-    const existing = await this.getById(id)
-
-    if (data.status && data.status !== existing.status) {
-      const allowed = VALID_TRANSITIONS[existing.status]
-      if (allowed && !allowed.includes(data.status)) {
-        throw new AppError(400, `Cannot transition from ${existing.status} to ${data.status}`)
-      }
-    }
+    await this.getById(id)
 
     const updateData: any = { ...data }
     if (data.dueDate) updateData.dueDate = new Date(data.dueDate)
