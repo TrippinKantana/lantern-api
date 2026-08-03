@@ -95,7 +95,7 @@ export const invoicesService = {
       include: invoiceInclude,
     })
     if (!invoice) throw new NotFoundError('Invoice')
-    return invoice
+    return this._reconcileStatus(invoice)
   },
 
   async create(data: {
@@ -231,7 +231,7 @@ export const invoicesService = {
       include: invoiceInclude,
     })
     if (!invoice) throw new NotFoundError('Invoice')
-    return invoice
+    return this._reconcileStatus(invoice)
   },
 
   /** Records a payment against an invoice and marks it PAID only once fully covered. */
@@ -264,11 +264,30 @@ export const invoicesService = {
       _sum: { amount: true },
     })
     const paidSoFar = Number(totalPaid._sum.amount || 0)
-    const isFullyPaid = paidSoFar >= Number(invoice.total)
+    const isFullyPaid = paidSoFar >= Number(invoice.total) - 0.005
+
+    // Status must always reflect what's actually been recorded — including
+    // correcting an invoice that was previously (incorrectly) marked PAID
+    // for less than its full total.
+    const nextStatus = isFullyPaid ? 'PAID' : invoice.status === 'PAID' ? 'SENT' : invoice.status
 
     return prisma.invoice.update({
       where: { id },
-      data: isFullyPaid ? { status: 'PAID', paidAt } : {},
+      data: { status: nextStatus, paidAt: isFullyPaid ? paidAt : null },
+      include: invoiceInclude,
+    })
+  },
+
+  /** Self-heals an invoice stuck as PAID with recorded payments that don't actually cover the total. */
+  async _reconcileStatus(invoice: any) {
+    if (invoice.status !== 'PAID' || !invoice.payments?.length) return invoice
+    const paid = invoice.payments
+      .filter((p: any) => p.status === 'completed')
+      .reduce((sum: number, p: any) => sum + Number(p.amount), 0)
+    if (paid >= Number(invoice.total) - 0.005) return invoice
+    return prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { status: 'SENT', paidAt: null },
       include: invoiceInclude,
     })
   },
