@@ -35,6 +35,15 @@ export const invoicesController = {
     res.status(201).json({ status: 'success', data: invoice })
   },
 
+  async deletePayment(req: Request, res: Response) {
+    const invoice = await invoicesService.deletePayment(
+      String(req.params.id),
+      String(req.params.paymentId),
+      req.user!.companyId,
+    )
+    res.json({ status: 'success', data: invoice })
+  },
+
   /**
    * Send invoice to client.
    * - { markOnly: true } → status SENT only (no email)

@@ -14,6 +14,7 @@ router.get('/:id', rbac('invoices', 'read'), (req, res, next) => { invoicesContr
 router.patch('/:id', rbac('invoices', 'update'), (req, res, next) => { invoicesController.update(req, res).catch(next) })
 router.delete('/:id', rbac('invoices', 'delete'), (req, res, next) => { invoicesController.delete(req, res).catch(next) })
 router.post('/:id/payments', rbac('invoices', 'update'), (req, res, next) => { invoicesController.recordPayment(req, res).catch(next) })
+router.delete('/:id/payments/:paymentId', rbac('invoices', 'delete'), (req, res, next) => { invoicesController.deletePayment(req, res).catch(next) })
 router.post('/:id/send', rbac('invoices', 'update'), (req, res, next) => { invoicesController.send(req, res).catch(next) })
 
 export { router as invoiceRoutes }

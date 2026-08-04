@@ -278,6 +278,29 @@ export const invoicesService = {
     })
   },
 
+  /** Deletes a recorded payment and re-derives the invoice status from what remains. */
+  async deletePayment(id: string, paymentId: string, userCompanyId: string | null) {
+    const invoice = await this.getByIdForStaff(id, userCompanyId)
+    const payment = invoice.payments?.find((p: any) => p.id === paymentId)
+    if (!payment) throw new NotFoundError('Payment')
+
+    await prisma.payment.delete({ where: { id: paymentId } })
+
+    const totalPaid = await prisma.payment.aggregate({
+      where: { invoiceId: id, status: 'completed' },
+      _sum: { amount: true },
+    })
+    const paidSoFar = Number(totalPaid._sum.amount || 0)
+    const isFullyPaid = paidSoFar >= Number(invoice.total) - 0.005
+    const nextStatus = isFullyPaid ? 'PAID' : invoice.status === 'PAID' ? 'SENT' : invoice.status
+
+    return prisma.invoice.update({
+      where: { id },
+      data: { status: nextStatus, paidAt: isFullyPaid ? payment.paidAt : null },
+      include: invoiceInclude,
+    })
+  },
+
   /** Self-heals an invoice stuck as PAID with recorded payments that don't actually cover the total. */
   async _reconcileStatus(invoice: any) {
     if (invoice.status !== 'PAID' || !invoice.payments?.length) return invoice
