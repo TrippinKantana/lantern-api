@@ -1,6 +1,32 @@
+import sanitizeHtml from 'sanitize-html'
 import { prisma } from '../../config/database.js'
 import { NotFoundError } from '../../shared/utils/errors.js'
 import { parsePagination, paginatedResponse } from '../../shared/utils/pagination.js'
+
+const RICH_TEXT_FIELDS = [
+  'aboutLantern', 'opportunity', 'responsibilities', 'requirements',
+  'preferredQualifications', 'whatYoullGain', 'probationEmployment',
+  'whyJoinLantern', 'howToApply',
+] as const
+
+function sanitizeRichText(html: unknown): string | undefined {
+  if (typeof html !== 'string') return undefined
+  return sanitizeHtml(html, {
+    allowedTags: ['p', 'strong', 'em', 'b', 'i', 'ul', 'ol', 'li', 'br'],
+    allowedAttributes: {},
+  })
+}
+
+// Job posting content is rendered unescaped (dangerouslySetInnerHTML) on the
+// public careers page, so this is the trust boundary — sanitize on write,
+// not on read, so it's enforced no matter how a request reaches the API.
+function sanitizeJobFields(data: Record<string, unknown>) {
+  const sanitized: Record<string, string | undefined> = {}
+  for (const field of RICH_TEXT_FIELDS) {
+    if (field in data) sanitized[field] = sanitizeRichText(data[field])
+  }
+  return sanitized
+}
 
 function slugify(title: string) {
   return title
@@ -59,15 +85,7 @@ export const careersService = {
         locationType: data.locationType || 'REMOTE',
         employmentType: data.employmentType || 'FULL_TIME',
         summary: data.summary,
-        aboutLantern: data.aboutLantern,
-        opportunity: data.opportunity,
-        responsibilities: data.responsibilities,
-        requirements: data.requirements,
-        preferredQualifications: data.preferredQualifications,
-        whatYoullGain: data.whatYoullGain,
-        probationEmployment: data.probationEmployment,
-        whyJoinLantern: data.whyJoinLantern,
-        howToApply: data.howToApply,
+        ...sanitizeJobFields(data),
         salaryMin: data.salaryMin,
         salaryMax: data.salaryMax,
         salaryCurrency: data.salaryCurrency || 'USD',
@@ -81,7 +99,7 @@ export const careersService = {
 
   async update(id: string, data: any) {
     const existing = await this.getById(id)
-    const updateData: any = { ...data }
+    const updateData: any = { ...data, ...sanitizeJobFields(data) }
     if (data.closesAt) updateData.closesAt = new Date(data.closesAt)
     if (data.status === 'PUBLISHED' && existing.status !== 'PUBLISHED') updateData.publishedAt = new Date()
     return prisma.jobPosting.update({ where: { id }, data: updateData })
