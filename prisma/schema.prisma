@@ -802,9 +802,15 @@ model JobPosting {
   locationType     JobLocationType   @default(REMOTE)
   employmentType   JobEmploymentType @default(FULL_TIME)
   summary          String?
-  description      String
-  requirements     String?
+  aboutLantern     String?
+  opportunity      String?
   responsibilities String?
+  requirements     String?
+  preferredQualifications String?
+  whatYoullGain    String?
+  probationEmployment String?
+  whyJoinLantern   String?
+  howToApply       String?
   salaryMin        Decimal?          @db.Decimal(12, 2)
   salaryMax        Decimal?          @db.Decimal(12, 2)
   salaryCurrency   String            @default("USD")
