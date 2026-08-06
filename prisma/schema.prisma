@@ -86,6 +86,25 @@ enum InvoiceStatus {
   REFUNDED
 }
 
+enum JobEmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+}
+
+enum JobLocationType {
+  REMOTE
+  HYBRID
+  ONSITE
+}
+
+enum JobPostingStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
 // ─── COMPANY (TENANT) ───
 
 model Company {
@@ -770,6 +789,56 @@ model FileAsset {
   ticket   Ticket?   @relation(fields: [ticketId], references: [id])
   contract Contract? @relation(fields: [contractId], references: [id])
   message  Message?  @relation(fields: [messageId], references: [id])
+}
+
+// ─── CAREERS ───
+
+model JobPosting {
+  id               String            @id @default(cuid())
+  title            String
+  slug             String            @unique
+  department       String?
+  location         String?
+  locationType     JobLocationType   @default(REMOTE)
+  employmentType   JobEmploymentType @default(FULL_TIME)
+  summary          String?
+  description      String
+  requirements     String?
+  responsibilities String?
+  salaryMin        Decimal?          @db.Decimal(12, 2)
+  salaryMax        Decimal?          @db.Decimal(12, 2)
+  salaryCurrency   String            @default("USD")
+  status           JobPostingStatus  @default(DRAFT)
+  publishedAt      DateTime?
+  closesAt         DateTime?
+  createdById      String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  applications JobApplication[]
+
+  @@index([status, publishedAt])
+}
+
+model JobApplication {
+  id           String   @id @default(cuid())
+  jobPostingId String
+  fullName     String
+  email        String
+  phone        String?
+  linkedinUrl  String?
+  portfolioUrl String?
+  coverNote    String?
+  resumeKey    String?
+  resumeName   String?
+  status       String   @default("new") // new, reviewing, shortlisted, interviewing, offered, rejected, hired
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  jobPosting JobPosting @relation(fields: [jobPostingId], references: [id], onDelete: Cascade)
+
+  @@index([jobPostingId, status])
 }
 
 // ─── CALENDAR ───

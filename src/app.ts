@@ -25,6 +25,7 @@ import { notificationRoutes } from './modules/notifications/notifications.routes
 import { reportingRoutes } from './modules/reporting/reporting.routes.js'
 import { auditLogRoutes } from './modules/audit-logs/audit-logs.routes.js'
 import { fileRoutes } from './modules/files/files.routes.js'
+import { careersRoutes } from './modules/careers/careers.routes.js'
 
 const app = express()
 
@@ -75,6 +76,14 @@ app.use(async (_req, _res, next) => {
 import { leadsPublicController } from './modules/crm/leads-public.controller.js'
 app.post('/api/v1/leads/submit', (req, res, next) => { leadsPublicController.submit(req, res).catch(next) })
 
+// Public careers listing + applications (no auth)
+import multer from 'multer'
+import { careersPublicController } from './modules/careers/careers-public.controller.js'
+const resumeUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
+app.get('/api/v1/careers/jobs', (req, res, next) => { careersPublicController.list(req, res).catch(next) })
+app.get('/api/v1/careers/jobs/:slug', (req, res, next) => { careersPublicController.getBySlug(req, res).catch(next) })
+app.post('/api/v1/careers/jobs/:id/apply', resumeUpload.single('resume'), (req, res, next) => { careersPublicController.apply(req, res).catch(next) })
+
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/users', userRoutes)
 app.use('/api/v1/companies', companyRoutes)
@@ -94,6 +103,7 @@ app.use('/api/v1/notifications', notificationRoutes)
 app.use('/api/v1/reports', reportingRoutes)
 app.use('/api/v1/audit-logs', auditLogRoutes)
 app.use('/api/v1/files', fileRoutes)
+app.use('/api/v1/jobs', careersRoutes)
 
 import { bankAccountRoutes } from './modules/bank-accounts/bank-accounts.routes.js'
 import { expenseRoutes } from './modules/expenses/expenses.routes.js'

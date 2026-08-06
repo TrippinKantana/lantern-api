@@ -59,6 +59,12 @@ export const ALL_PERMISSIONS: PermissionDef[] = [
   { resource: 'goals', action: 'create', description: 'Create goals' },
   { resource: 'goals', action: 'read', description: 'View goals' },
   { resource: 'goals', action: 'update', description: 'Update goals' },
+  { resource: 'jobs', action: 'create', description: 'Create job postings' },
+  { resource: 'jobs', action: 'read', description: 'View job postings' },
+  { resource: 'jobs', action: 'update', description: 'Update job postings' },
+  { resource: 'jobs', action: 'delete', description: 'Delete job postings' },
+  { resource: 'job_applications', action: 'read', description: 'View job applications' },
+  { resource: 'job_applications', action: 'update', description: 'Update job applications' },
 ]
 
 export const ROLE_PERMISSIONS: Record<string, { resource: string; action: string }[]> = {
@@ -79,6 +85,8 @@ export const ROLE_PERMISSIONS: Record<string, { resource: string; action: string
     { resource: 'time_entries', action: 'create' }, { resource: 'time_entries', action: 'read' }, { resource: 'time_entries', action: 'update' },
     { resource: 'calendar', action: 'create' }, { resource: 'calendar', action: 'read' },
     { resource: 'goals', action: 'read' },
+    { resource: 'jobs', action: 'read' },
+    { resource: 'job_applications', action: 'read' }, { resource: 'job_applications', action: 'update' },
   ],
   PROJECT_MANAGER: [
     { resource: 'projects', action: 'create' }, { resource: 'projects', action: 'read' }, { resource: 'projects', action: 'update' },
