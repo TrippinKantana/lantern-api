@@ -804,6 +804,7 @@ model JobPosting {
   summary          String?
   aboutLantern     String?
   opportunity      String?
+  description      String? // unused legacy column, kept in place to avoid dropping any data that may already exist in it
   responsibilities String?
   requirements     String?
   preferredQualifications String?
