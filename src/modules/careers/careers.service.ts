@@ -1,4 +1,4 @@
-import sanitizeHtml from 'sanitize-html'
+import { filterXSS } from 'xss'
 import { prisma } from '../../config/database.js'
 import { NotFoundError } from '../../shared/utils/errors.js'
 import { parsePagination, paginatedResponse } from '../../shared/utils/pagination.js'
@@ -9,12 +9,11 @@ const RICH_TEXT_FIELDS = [
   'whyJoinLantern', 'howToApply',
 ] as const
 
+const RICH_TEXT_WHITELIST = { p: [], strong: [], em: [], b: [], i: [], ul: [], ol: [], li: [], br: [] }
+
 function sanitizeRichText(html: unknown): string | undefined {
   if (typeof html !== 'string') return undefined
-  return sanitizeHtml(html, {
-    allowedTags: ['p', 'strong', 'em', 'b', 'i', 'ul', 'ol', 'li', 'br'],
-    allowedAttributes: {},
-  })
+  return filterXSS(html, { whiteList: RICH_TEXT_WHITELIST, stripIgnoreTag: true, stripIgnoreTagBody: true })
 }
 
 // Job posting content is rendered unescaped (dangerouslySetInnerHTML) on the
